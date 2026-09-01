@@ -19,9 +19,8 @@ import { AssetsModule } from './assets/assets.module';
       isGlobal: true,
       useFactory: async () => ({
         store: await redisStore({
-          // If REDIS_URL exists (like on Render), use it. Otherwise, fallback to localhost.
           url: process.env.REDIS_URL || 'redis://localhost:6379',
-          ttl: 60000,
+          ttl: 60000, 
         }),
       }),
     }),
