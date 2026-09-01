@@ -14,15 +14,14 @@ import { AssetsModule } from './assets/assets.module';
     }]),
 
     
+    // 2. Configure the Redis Cache dynamically
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => ({
         store: await redisStore({
-          socket: {
-            host: 'localhost',
-            port: 6379,
-          },
-          ttl: 60000, 
+          // If REDIS_URL exists (like on Render), use it. Otherwise, fallback to localhost.
+          url: process.env.REDIS_URL || 'redis://localhost:6379',
+          ttl: 60000,
         }),
       }),
     }),
