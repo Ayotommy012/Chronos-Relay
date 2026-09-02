@@ -1,32 +1,39 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom, throwError } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 
-export interface AssetRateResponse{
-  asset: string,
-  baseCurrency: string,
-  rate: string,
-  timestamp: string,
-  source: string
+interface ExchangeRateApiResponse {
+  rates: Record<string, number>;
 }
+
+export interface AssetRateResponse {
+  asset: string;
+  baseCurrency: string;
+  rate: number;
+  timestamp: string;
+  source: string;
+}
+
 @Injectable()
 export class AssetService {
   constructor(private readonly httpService: HttpService) {}
-  async getAssetPrice(ticker: string): Promise<AssetRateResponse>{
+
+  async getAssetPrice(ticker: string): Promise<AssetRateResponse> {
     const formattedTicker = ticker.toUpperCase();
-   
-    const apiUrl = `https://api.exchangerate-api.com/v4/latest/USD`;
+
+    const apiUrl = 'https://api.exchangerate-api.com/v4/latest/USD';
 
     try {
-      const response = await firstValueFrom(this.httpService.get(apiUrl));
-      
-      console.log('RAW EXTERNAL API RESPONSE:', response.data);
+      const response = await firstValueFrom(
+        this.httpService.get<ExchangeRateApiResponse>(apiUrl),
+      );
 
-      const rates = response.data?.rates;
+      const rates = response.data.rates;
+      const rate = rates[formattedTicker];
 
-      if (!rates || !rates[formattedTicker]) {
+      if (rate === undefined) {
         throw new HttpException(
-          `Asset ticker '${formattedTicker}' is not found.`,
+          `Asset ticker '${formattedTicker}' was not found.`,
           HttpStatus.NOT_FOUND,
         );
       }
@@ -34,17 +41,18 @@ export class AssetService {
       return {
         asset: formattedTicker,
         baseCurrency: 'USD',
-        rate: rates[formattedTicker],
+        rate,
         timestamp: new Date().toISOString(),
-        source: 'external-provider', 
+        source: 'external-provider',
       };
-    } catch(error){
-      if (error instanceof HttpException){
+    } catch (error) {
+      if (error instanceof HttpException) {
         throw error;
       }
+
       throw new HttpException(
         'Failed to fetch data from upstream provider.',
-        HttpStatus.BAD_GATEWAY
+        HttpStatus.BAD_GATEWAY,
       );
     }
   }
