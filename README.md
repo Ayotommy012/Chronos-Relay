@@ -1,93 +1,375 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Chronos Relay
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> A Redis-cached, rate-limited financial data proxy built with NestJS and TypeScript.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Chronos Relay is a backend service that sits between client applications and external financial data providers. It provides a controlled API layer with **Redis caching, request throttling, response transformation, and upstream API abstraction**.
 
-## Description
-# Chronos Relay: Financial API Proxy
+The service is designed to reduce unnecessary requests to third-party providers while exposing a consistent internal API to consuming applications.
 
-> A secure, high-performance middleware caching layer for live financial, asset, and commodity data feeds.
+## Live Resources
 
-## 🎯 Overview
-External financial APIs are often slow, heavily rate-limited, and expensive. This microservice acts as a protective shield and caching layer between client applications and third-party data providers. By intercepting requests and caching commodity and asset data in memory, this proxy reduces external API calls by up to 90% while dropping response latency from ~800ms to < 25ms.
+* **Live API:** [View Deployment](YOUR_RENDER_URL)
+* **API Documentation:** [Postman Documentation](YOUR_POSTMAN_DOCUMENTATION_URL)
 
-## 🏗 Architecture & Tech Stack
-*   **Framework:** NestJS (TypeScript)
-*   **Caching:** Redis (via `@nestjs/cache-manager`)
-*   **Security:** `@nestjs/throttler` for strict IP rate limiting
-*   **HTTP Client:** `@nestjs/axios` for external data fetching
-*   **Deployment:** Dockerized for seamless environment parity
+## Engineering Highlights
 
-## 🚀 Key Features
-1.  **In-Memory Data Caching:** Implements a 60-second Time-To-Live (TTL) cache for all asset and commodity price lookups. 
-2.  **DDoS & Spam Protection:** Enforces a strict IP-based rate limit to protect infrastructure from abuse and prevent external API exhaustion.
-3.  **Data Transformation:** Strips bloated third-party payloads into clean, predictable JSON objects before delivering them to the client.
+* **Redis-backed caching** for frequently requested financial data
+* **TTL-based cache invalidation** to balance data freshness and upstream request volume
+* **IP-based rate limiting** using NestJS Throttler
+* **External API integration** using NestJS Axios
+* **Response transformation** into a consistent internal data contract
+* **Environment-based configuration** for external service credentials
+* **Dockerized application** for consistent runtime environments
+* **Automated CI pipeline** for linting, testing, and build verification
+* Modular NestJS architecture using controllers, services, modules, and dependency injection
 
-## 🛠 API Endpoints
+## Architecture
 
-**`GET /api/v1/assets/:ticker`**
-Fetches live data for a specific asset or commodity (e.g., `EUR`, `GBP`).
+```text
+                     ┌──────────────────┐
+                     │      Client      │
+                     └────────┬─────────┘
+                              │
+                              │ HTTP Request
+                              ▼
+                     ┌──────────────────┐
+                     │  Chronos Relay   │
+                     │     NestJS       │
+                     └────────┬─────────┘
+                              │
+                       Rate Limiting
+                              │
+                              ▼
+                     ┌──────────────────┐
+                     │   Redis Cache    │
+                     └───────┬──────────┘
+                             │
+                  ┌──────────┴──────────┐
+                  │                     │
+              Cache Hit             Cache Miss
+                  │                     │
+                  │                     ▼
+                  │           ┌──────────────────┐
+                  │           │ External Finance │
+                  │           │       API        │
+                  │           └────────┬─────────┘
+                  │                    │
+                  │             Transform Data
+                  │                    │
+                  │                    ▼
+                  │              Cache Result
+                  │                    │
+                  └──────────┬─────────┘
+                             │
+                             ▼
+                     ┌──────────────────┐
+                     │   JSON Response  │
+                     └──────────────────┘
+```
 
-*Response:*
+## Request Flow
+
+When a client requests financial asset data, Chronos Relay first checks whether a valid cached response is available.
+
+### Cache Hit
+
+```text
+Client Request
+      ↓
+Rate Limiter
+      ↓
+Redis Lookup
+      ↓
+Cached Data Found
+      ↓
+Return Response
+```
+
+No request to the external provider is required.
+
+### Cache Miss
+
+```text
+Client Request
+      ↓
+Rate Limiter
+      ↓
+Redis Lookup
+      ↓
+Cache Miss
+      ↓
+External Financial API
+      ↓
+Transform Response
+      ↓
+Store in Redis
+      ↓
+Return Response
+```
+
+This design prevents identical requests from unnecessarily reaching the external provider while keeping the client-facing API independent of the upstream provider's response structure.
+
+## Tech Stack
+
+| Layer             | Technology              |
+| ----------------- | ----------------------- |
+| Language          | TypeScript              |
+| Runtime           | Node.js                 |
+| Framework         | NestJS                  |
+| Cache             | Redis                   |
+| HTTP Client       | Axios / `@nestjs/axios` |
+| Rate Limiting     | `@nestjs/throttler`     |
+| Testing           | Jest                    |
+| Containerization  | Docker                  |
+| CI                | GitHub Actions          |
+| Deployment        | Render                  |
+| API Documentation | Postman                 |
+
+## API
+
+### Get Asset Data
+
+```http
+GET /api/v1/assets/:ticker
+```
+
+Retrieves financial data for the specified asset.
+
+Example:
+
+```http
+GET /api/v1/assets/EUR
+```
+
+### Path Parameters
+
+| Parameter | Type   | Required | Description                                      |
+| --------- | ------ | -------- | ------------------------------------------------ |
+| `ticker`  | string | Yes      | Asset ticker to retrieve, such as `EUR` or `GBP` |
+
+### Example Response
+
 ```json
 {
   "asset": "EUR",
   "baseCurrency": "USD",
   "rate": 0.92,
   "timestamp": "2026-08-29T23:15:00Z",
-  "source": "external-provider" 
+  "source": "external-provider"
 }
-
-## Project setup
-
-```bash
-$ yarn install
 ```
 
-## Compile and run the project
+### Response Codes
 
-```bash
-# development
-$ yarn run start
+| Status                  | Meaning                                                            |
+| ----------------------- | ------------------------------------------------------------------ |
+| `200 OK`                | Asset data retrieved successfully                                  |
+| `404 Not Found`         | Requested ticker was not found                                     |
+| `429 Too Many Requests` | Client exceeded the configured rate limit                          |
+| `502 Bad Gateway`       | Upstream financial data provider could not be reached successfully |
 
-# watch mode
-$ yarn run start:dev
+For interactive request documentation and examples, see the **published Postman documentation** linked above.
 
-# production mode
-$ yarn run start:prod
+## Caching Strategy
+
+Chronos Relay uses Redis to cache asset lookups.
+
+Cached responses are stored with a configured **Time-To-Live (TTL)**. During the TTL window, repeated requests for the same asset can be served from Redis rather than triggering another external API request.
+
+Once the cached entry expires, the next request retrieves fresh data from the upstream provider and updates the cache.
+
+This provides a balance between:
+
+* data freshness
+* response efficiency
+* upstream API usage
+* protection against provider rate limits
+
+## Rate Limiting
+
+Chronos Relay uses `@nestjs/throttler` to apply IP-based request limits.
+
+Rate limiting protects the service from excessive request traffic and helps prevent clients from indirectly exhausting the quota of the upstream financial data provider.
+
+Requests exceeding the configured threshold receive:
+
+```http
+429 Too Many Requests
 ```
 
-## Run tests
+## Response Transformation
+
+External providers often expose response structures that clients should not need to understand or depend on.
+
+Chronos Relay transforms provider responses into a smaller internal contract:
+
+```json
+{
+  "asset": "EUR",
+  "baseCurrency": "USD",
+  "rate": 0.92,
+  "timestamp": "2026-08-29T23:15:00Z",
+  "source": "external-provider"
+}
+```
+
+This decouples consuming applications from the external provider and allows the upstream implementation to change without requiring corresponding changes across every client.
+
+## Getting Started
+
+### Prerequisites
+
+You will need:
+
+* Node.js
+* Yarn
+* Redis
+* Docker, if using the containerized setup
+
+### Clone the Repository
 
 ```bash
-# unit tests
-$ yarn run test
-
-# e2e tests
-$ yarn run test:e2e
-
-# test coverage
-$ yarn run test:cov
+git clone https://github.com/Ayotommy012/chronos-relay.git
+cd chronos-relay
 ```
+
+### Install Dependencies
+
+```bash
+yarn install
+```
+
+### Environment Configuration
+
+Configure the environment variables required by the application and external financial data provider.
+
+Do not commit credentials or secrets to source control.
+
+### Run in Development
+
+```bash
+yarn start:dev
+```
+
+The API will be available locally at:
+
+```text
+http://localhost:3000
+```
+
+## Testing
+
+Run the unit test suite:
+
+```bash
+yarn test
+```
+
+Run tests serially:
+
+```bash
+yarn test --runInBand
+```
+
+Run end-to-end tests:
+
+```bash
+yarn test:e2e
+```
+
+Generate test coverage:
+
+```bash
+yarn test:cov
+```
+
+## Code Quality
+
+Run ESLint:
+
+```bash
+yarn lint
+```
+
+The project is configured to enforce TypeScript code-quality and type-safety rules, including checks against unsafe access to untyped external API responses.
+
+## Continuous Integration
+
+Chronos Relay uses **GitHub Actions** to automatically validate changes pushed to the repository.
+
+The CI pipeline performs:
+
+```text
+Checkout
+   ↓
+Install Dependencies
+   ↓
+Lint
+   ↓
+Unit Tests
+   ↓
+Production Build
+```
+
+A change must successfully pass the project's linting, automated tests, and production build process for the CI workflow to complete successfully.
+
+## Docker
+
+Build the Docker image:
+
+```bash
+docker build -t chronos-relay .
+```
+
+Run the container:
+
+```bash
+docker run -p 3000:3000 chronos-relay
+```
+
+Required environment variables should be supplied securely when running the container.
 
 ## Deployment
 
+Chronos Relay is deployed on **Render**.
 
+The production deployment provides a publicly accessible instance of the API for testing and integration.
+
+See **Live Resources** at the top of this README for the deployed API and interactive Postman documentation.
+
+## Project Status
+
+* [x] NestJS application architecture
+* [x] External financial API integration
+* [x] Asset retrieval API
+* [x] Typed external API responses
+* [x] Redis caching
+* [x] TTL-based cache expiration
+* [x] IP-based request throttling
+* [x] Response transformation
+* [x] Docker configuration
+* [x] Unit testing
+* [x] ESLint / TypeScript quality checks
+* [x] Published Postman API documentation
+* [x] Production deployment on Render
+* [x] GitHub Actions CI
+* [ ] Expanded integration and end-to-end test coverage
+* [ ] Structured production observability
+
+## Future Improvements
+
+* Expand integration and end-to-end testing
+* Add structured application logging
+* Add request tracing and operational metrics
+* Add cache hit/miss observability
+* Add upstream-provider health monitoring
+* Support additional financial data providers
+* Introduce provider fallback strategies
+
+## Engineering Focus
+
+Chronos Relay explores backend infrastructure concerns that arise when applications depend on third-party services:
+
+**caching · rate limiting · API abstraction · external service integration · response normalization · reliability**
+
+Rather than exposing an external provider directly to clients, Chronos Relay provides an intermediary layer that can evolve independently of both the client and upstream service.
