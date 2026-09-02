@@ -1,5 +1,9 @@
 # Chronos Relay
+![CI](https://github.com/Ayotommy012/Chronos-Relay/actions/workflows/ci.yml/badge.svg)
+## Live Resources
 
+- **Live API:** [View Chronos Relay](https://chronos-relay.onrender.com)
+- **API Documentation:** [View Postman Documentation](https://documenter.getpostman.com/view/47120294/2sBYAvu9nN)
 > A Redis-cached, rate-limited financial data proxy built with NestJS and TypeScript.
 
 Chronos Relay is a backend service that sits between client applications and external financial data providers. It provides a controlled API layer with **Redis caching, request throttling, response transformation, and upstream API abstraction**.
