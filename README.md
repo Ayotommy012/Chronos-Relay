@@ -8,8 +8,8 @@ The service is designed to reduce unnecessary requests to third-party providers 
 
 ## Live Resources
 
-* **Live API:** [View Deployment]([YOUR_RENDER_UR](https://chronos-relay.onrender.com)L)
-* **API Documentation:** [Postman Documentation]([YOUR_POSTMAN_DOCUMENTATION_URL](https://documenter.getpostman.com/view/47120294/2sBYAvu9nN))
+- **Live API:** [View Chronos Relay](https://chronos-relay.onrender.com)
+- **API Documentation:** [View Postman Documentation](https://documenter.getpostman.com/view/47120294/2sBYAvu9nN)
 
 ## Engineering Highlights
 
